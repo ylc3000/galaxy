@@ -108,42 +108,15 @@ function createParticles() {
     particlesGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
     particlesGeometry.setAttribute('originalPosition', new THREE.Float32BufferAttribute(originalPositions, 3));
 
-    // Shader Material for custom particle behavior
-    const vertexShader = `
-        attribute float size;
-        attribute vec3 color;
-        varying vec3 vColor;
-        void main() {
-            vColor = color;
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = size * (300.0 / -mvPosition.z);
-            gl_Position = projectionMatrix * mvPosition;
-        }
-    `;
-
-    const fragmentShader = `
-        uniform sampler2D pointTexture;
-        varying vec3 vColor;
-        void main() {
-            // Circular particle
-            vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
-            if (dot(circCoord, circCoord) > 1.0) {
-                discard;
-            }
-            gl_FragColor = vec4(vColor, 1.0);
-        }
-    `;
-
-    particlesMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            pointTexture: { value: new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png') }
-        },
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
+    // Points Material with vertex colors
+    particlesMaterial = new THREE.PointsMaterial({
+        size: CONFIG.particleSize,
+        vertexColors: true,
         blending: THREE.AdditiveBlending,
-        depthTest: false,
         transparent: true,
-        vertexColors: true
+        sizeAttenuation: true,
+        depthWrite: false,
+        map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png')
     });
 
     particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
