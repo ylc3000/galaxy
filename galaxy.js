@@ -129,10 +129,43 @@ function onDocumentMouseMove(event) {
     targetMouse.y = (event.clientY - windowHalfY) * 0.05;
 }
 
-function onDocumentClick() {
-    // Pulse effect: Randomize some velocities or colors temporarily
-    CONFIG.bloomStrength = 3.0;
-    setTimeout(() => { CONFIG.bloomStrength = 1.5; }, 200);
+function onDocumentClick(event) {
+    // Get click position in world space
+    const clickX = (event.clientX - windowHalfX) * 0.05;
+    const clickY = -(event.clientY - windowHalfY) * 0.05;
+
+    // Intense pulse effect
+    CONFIG.bloomStrength = 5.0;
+    setTimeout(() => { CONFIG.bloomStrength = 1.5; }, 300);
+
+    // Create shockwave effect on particles
+    const positions = particlesGeometry.attributes.position.array;
+    const count = particlesGeometry.attributes.position.count;
+
+    for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        const dx = positions[i3] - clickX;
+        const dy = positions[i3 + 1] - clickY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Apply explosive force to nearby particles
+        if (dist < 10) {
+            const force = (10 - dist) / 10;
+            const angle = Math.atan2(dy, dx);
+
+            positions[i3] += Math.cos(angle) * force * 5;
+            positions[i3 + 1] += Math.sin(angle) * force * 5;
+        }
+    }
+
+    particlesGeometry.attributes.position.needsUpdate = true;
+
+    // Flash effect on screen
+    document.body.style.transition = 'background-color 0.1s';
+    document.body.style.backgroundColor = 'rgba(0, 243, 255, 0.1)';
+    setTimeout(() => {
+        document.body.style.backgroundColor = '';
+    }, 100);
 }
 
 function onWindowResize() {
