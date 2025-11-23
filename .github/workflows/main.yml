@@ -1,0 +1,38 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main   # 推 main 自动部署
+  pull_request: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      # 可选：如果你的项目需要 build，那么保留；否则删除
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy to Vercel
+        run: |
+          npm install -g vercel
+          vercel pull --yes --token=$VERCEL_TOKEN
+          vercel build --token=$VERCEL_TOKEN
+          vercel deploy --prebuilt --token=$VERCEL_TOKEN
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
