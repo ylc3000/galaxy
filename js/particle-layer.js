@@ -31,14 +31,7 @@ export class ParticleLayer {
         this.isAnimating = true;
         this.galaxyColors = []; // Colors from galaxy layer
 
-        // Color Cube repulsion state
-        this.cubeRepulsion = {
-            active: false,
-            radius: 0,
-            progress: 0,
-            centerX: 0,
-            centerY: 0
-        };
+
 
         this.init();
     }
@@ -55,26 +48,7 @@ export class ParticleLayer {
             }
         });
 
-        // Listen for color cube growth events
-        this.eventBus.on('colorCube:growing', (data) => {
-            this.cubeRepulsion.active = true;
-            this.cubeRepulsion.centerX = this.width / 2;
-            this.cubeRepulsion.centerY = this.height / 2;
-        });
-
-        this.eventBus.on('colorCube:growthUpdate', (data) => {
-            this.cubeRepulsion.radius = data.radius;
-            this.cubeRepulsion.progress = data.progress;
-        });
-
-        this.eventBus.on('colorCube:growthComplete', () => {
-            // 保持排斥效果
-        });
-
-        this.eventBus.on('colorCube:hidden', () => {
-            this.cubeRepulsion.active = false;
-            this.cubeRepulsion.radius = 0;
-        });
+        // Color cube events removed - no repulsion effect
 
         window.addEventListener('resize', () => this.resize());
     }
@@ -166,7 +140,7 @@ export class ParticleLayer {
         this.ctx.clearRect(0, 0, this.width, this.height);
 
         this.particles.forEach(p => {
-            p.update(this.mouse, this.config, this.cubeRepulsion);
+            p.update(this.mouse, this.config);
             p.draw(this.ctx);
         });
     }
@@ -216,35 +190,10 @@ class Particle {
         this.glowIntensity = 0;  // 发光强度 0-1
     }
 
-    update(mouse, config, cubeRepulsion) {
+    update(mouse, config) {
         // Move towards target (Lerp)
         this.x += (this.tx - this.x) * config.ease;
         this.y += (this.ty - this.y) * config.ease;
-
-        // === Color Cube Repulsion ===
-        if (cubeRepulsion && cubeRepulsion.active && cubeRepulsion.radius > 0) {
-            const cubeDx = cubeRepulsion.centerX - this.x;
-            const cubeDy = cubeRepulsion.centerY - this.y;
-            const cubeDist = Math.sqrt(cubeDx * cubeDx + cubeDy * cubeDy);
-            
-            // 在立方体影响范围内
-            if (cubeDist < cubeRepulsion.radius) {
-                const cubeInfluence = 1 - (cubeDist / cubeRepulsion.radius);
-                const cubeAngle = Math.atan2(cubeDy, cubeDx);
-                
-                // 排斥力（推开粒子）- 增大力度到 25
-                const cubeForce = cubeInfluence * 25 * cubeRepulsion.progress;
-                this.x -= Math.cos(cubeAngle) * cubeForce;
-                this.y -= Math.sin(cubeAngle) * cubeForce;
-                
-                // 同时更新目标位置，防止粒子回弹
-                this.tx = this.x;
-                this.ty = this.y;
-                
-                // 发光效果（增强）
-                this.glowIntensity = Math.max(this.glowIntensity, cubeInfluence * 0.5);
-            }
-        }
 
         // === Mouse Interaction ===
         const dx = mouse.x - this.x;
