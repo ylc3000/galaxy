@@ -36,17 +36,7 @@
     <!-- Layer 3: 2D Particle Foreground (Canvas) -->
     <canvas id="particle-canvas"></canvas>
 
-    <!-- Layer 4: 3D Color Cube Modal (WebGL) -->
-    <div id="color-cube-modal" class="modal hidden">
-      <div class="modal-content">
-        <button class="modal-close" id="close-modal">✕</button>
-        <div id="cube-container"></div>
-        <div class="color-info-panel">
-          <h3 id="color-name">Color Analysis</h3>
-          <div class="color-values" id="color-values"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Modal removed -->
 
     <!-- UI Overlay -->
     <div class="ui-overlay">
@@ -63,11 +53,11 @@
       <div class="controls-info">
         <div class="control-item">
           <span class="icon">🖱️</span>
-          <span>Move to Explore</span>
+          <span>Drag to Rotate</span>
         </div>
         <div class="control-item">
-          <span class="icon">👆</span>
-          <span>Click to Analyze Colors</span>
+          <span class="icon">🔄</span>
+          <span>Auto Rotate</span>
         </div>
       </div>
 
@@ -82,13 +72,7 @@
         </div>
       </div>
 
-      <!-- Color Palette (saved colors) -->
-      <div class="color-palette" id="color-palette">
-        <div class="palette-title">PALETTE</div>
-        <div class="palette-colors" id="palette-colors">
-          <!-- Colors will be added dynamically -->
-        </div>
-      </div>
+      <!-- Palette removed -->
     </div>
 
     <!-- Loading Screen -->

@@ -1,7 +1,7 @@
 // ===== APPLICATION CONTROLLER =====
 // Main controller that integrates all layers
 
-import { EventBus, PerformanceMonitor, DOMUtils, StorageUtils, AnimationController } from './utils.js';
+import { EventBus, PerformanceMonitor, DOMUtils, AnimationController } from './utils.js';
 import { GalaxyLayer } from './galaxy-layer.js';
 import { ParticleLayer } from './particle-layer.js';
 import { ColorCube } from './color-cube.js';
@@ -28,12 +28,9 @@ class CosmicLabApp {
         // DOM Elements
         this.elements = {
             loadingScreen: DOMUtils.getById('loading-screen'),
-            modal: DOMUtils.getById('color-cube-modal'),
-            closeModal: DOMUtils.getById('close-modal'),
             modeDisplay: DOMUtils.getById('mode-display'),
             galaxyCount: DOMUtils.getById('galaxy-count'),
-            fpsCounter: DOMUtils.getById('fps-counter'),
-            paletteColors: DOMUtils.getById('palette-colors')
+            fpsCounter: DOMUtils.getById('fps-counter')
         };
 
         this.init();
@@ -47,8 +44,7 @@ class CosmicLabApp {
             // Setup event listeners
             this.setupEventListeners();
 
-            // Load saved palette
-            this.loadPalette();
+            // Palette functionality removed
 
             // Start animation loop
             this.animate();
@@ -83,9 +79,7 @@ class CosmicLabApp {
         const particleCanvas = DOMUtils.getById('particle-canvas');
         this.particleLayer = new ParticleLayer(particleCanvas, this.eventBus);
 
-        // Layer 4: Color Cube Modal
-        const cubeContainer = DOMUtils.getById('cube-container');
-        this.colorCube = new ColorCube(cubeContainer, this.eventBus);
+        // Modal color cube removed
 
         // Update stats (只更新星系粒子数，因为我们移除了 particle-count 元素)
         DOMUtils.setText('galaxy-count', this.galaxyLayer.getParticleCount().toLocaleString());
@@ -95,33 +89,72 @@ class CosmicLabApp {
     }
 
     startColorCubeGrowth() {
-        // 生成一组示例颜色用于 Color Cube
-        const sampleColors = this.generateSampleColors(500);
-        
-        // 显示背景 Color Cube 并开始生长动画
-        this.colorCubeBackground.show(sampleColors);
+        // 不传入颜色数据，让 ColorCube 使用从 API 加载的真实颜色数据
+        this.colorCubeBackground.show();
         
         console.log('🎨 Color Cube growth started');
     }
 
     generateSampleColors(count) {
         const colors = [];
-        for (let i = 0; i < count; i++) {
-            // 生成均匀分布的颜色
-            const h = (i / count) * 360;
-            const s = 50 + Math.random() * 50;
-            const l = 30 + Math.random() * 40;
-            
-            const rgb = this.hslToRgb(h, s, l);
-            colors.push({
-                r: rgb.r,
-                g: rgb.g,
-                b: rgb.b,
-                hex: this.rgbToHex(rgb.r, rgb.g, rgb.b),
-                hsl: { h, s, l }
-            });
+        
+        // 生成 RGB 立方体中均匀分布的颜色
+        const steps = Math.ceil(Math.pow(count, 1/3)); // 立方根，确保 3D 均匀分布
+        
+        for (let r = 0; r < steps; r++) {
+            for (let g = 0; g < steps; g++) {
+                for (let b = 0; b < steps; b++) {
+                    const red = Math.round((r / (steps - 1)) * 255);
+                    const green = Math.round((g / (steps - 1)) * 255);
+                    const blue = Math.round((b / (steps - 1)) * 255);
+                    
+                    const hsl = this.rgbToHslSimple(red, green, blue);
+                    
+                    colors.push({
+                        r: red,
+                        g: green,
+                        b: blue,
+                        hex: this.rgbToHex(red, green, blue),
+                        hsl: hsl
+                    });
+                    
+                    if (colors.length >= count) break;
+                }
+                if (colors.length >= count) break;
+            }
+            if (colors.length >= count) break;
         }
+        
         return colors;
+    }
+
+    rgbToHslSimple(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+
+        if (max === min) {
+            h = s = 0;
+        } else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            
+            switch (max) {
+                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / d + 2) / 6; break;
+                case b: h = ((r - g) / d + 4) / 6; break;
+            }
+        }
+
+        return {
+            h: h * 360,
+            s: s * 100,
+            l: l * 100
+        };
     }
 
     hslToRgb(h, s, l) {
@@ -168,20 +201,7 @@ class CosmicLabApp {
             this.particleLayer.onMouseMove(e.clientX, e.clientY);
         });
 
-        // Click (triggers analyze mode)
-        document.addEventListener('click', (e) => {
-            // Ignore clicks on UI elements
-            if (e.target.closest('.ui-overlay') || e.target.closest('.modal')) {
-                return;
-            }
-
-            this.galaxyLayer.onClick(e.clientX, e.clientY);
-        });
-
-        // Galaxy click event
-        this.eventBus.on('galaxy:click', (data) => {
-            this.enterAnalyzeMode(data);
-        });
+        // Click functionality removed
 
         // Big Bang complete event - 等待粒子稳定后触发 Color Cube
         this.eventBus.on('galaxy:bigBangComplete', () => {
@@ -193,38 +213,27 @@ class CosmicLabApp {
             }, 3000);
         });
 
-        // Modal close
-        this.elements.closeModal?.addEventListener('click', () => {
-            this.exitAnalyzeMode();
-        });
+        // Modal functionality removed
 
-        // Particle mode buttons
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const mode = btn.dataset.mode;
-                this.setParticleMode(mode);
+        // Color model selector removed - using RGB only
 
-                // Update active state
-                document.querySelectorAll('.mode-btn').forEach(b => {
-                    DOMUtils.removeClass(b, 'active');
-                });
-                DOMUtils.addClass(btn, 'active');
+        // Action buttons
+        const resetCameraBtn = document.getElementById('reset-camera');
+        const toggleParticlesBtn = document.getElementById('toggle-particles');
+
+        if (resetCameraBtn) {
+            resetCameraBtn.addEventListener('click', () => {
+                this.resetCameraView();
             });
-        });
+        }
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.appState.mode === 'analyze') {
-                this.exitAnalyzeMode();
-            }
-        });
+        if (toggleParticlesBtn) {
+            toggleParticlesBtn.addEventListener('click', () => {
+                this.toggleParticles();
+            });
+        }
 
-        // Window resize
-        window.addEventListener('resize', () => {
-            if (this.appState.mode === 'analyze') {
-                this.colorCube.onResize();
-            }
-        });
+        // Window resize removed (no modal)
     }
 
     sampleGalaxyColors() {
@@ -241,183 +250,52 @@ class CosmicLabApp {
         this.particleLayer.setMode(mode);
     }
 
-    enterAnalyzeMode(data) {
-        this.appState.mode = 'analyze';
-        this.appState.selectedColors = data.colors;
-
-        // Update UI
-        DOMUtils.setText('mode-display', 'ANALYZE');
-        DOMUtils.addClass(this.elements.modeDisplay, 'analyze');
-        DOMUtils.removeClass(this.elements.modal, 'hidden');
-
-        // Show color cube with selected colors
-        this.colorCube.show(data.colors);
-
-        // Update color info panel
-        this.updateColorInfo(data.colors);
-
-        // Add to palette (first color)
-        if (data.colors.length > 0) {
-            this.addToPalette(data.colors[0]);
+    resetCameraView() {
+        // 重置立方体相机到初始位置
+        if (this.colorCubeBackground && this.colorCubeBackground.controls) {
+            const controls = this.colorCubeBackground.controls;
+            const camera = this.colorCubeBackground.camera;
+            
+            // 平滑过渡到初始位置
+            this.animController.animate(
+                'camera-reset',
+                0,
+                1,
+                1000,
+                (progress) => {
+                    // 插值到目标位置
+                    camera.position.x = camera.position.x + (180 - camera.position.x) * progress * 0.1;
+                    camera.position.y = camera.position.y + (100 - camera.position.y) * progress * 0.1;
+                    camera.position.z = camera.position.z + (180 - camera.position.z) * progress * 0.1;
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                },
+                () => {
+                    console.log('🎯 Camera view reset');
+                }
+            );
         }
-
-        console.log(`Analyzed ${data.colors.length} colors at position (${data.x.toFixed(2)}, ${data.y.toFixed(2)})`);
     }
 
-    exitAnalyzeMode() {
-        this.appState.mode = 'explore';
-
-        // Update UI
-        DOMUtils.setText('mode-display', 'EXPLORE');
-        DOMUtils.removeClass(this.elements.modeDisplay, 'analyze');
-        DOMUtils.addClass(this.elements.modal, 'hidden');
-
-        // Hide color cube
-        this.colorCube.hide();
-    }
-
-    updateColorInfo(colors) {
-        if (colors.length === 0) return;
-
-        const colorValuesEl = DOMUtils.getById('color-values');
-        const colorNameEl = DOMUtils.getById('color-name');
-
-        if (!colorValuesEl || !colorNameEl) return;
-
-        // Show info for the first color
-        const color = colors[0];
-
-        colorNameEl.textContent = `Color Analysis (${colors.length} colors sampled)`;
-
-        colorValuesEl.innerHTML = `
-            <div>
-                <strong>HEX:</strong> ${color.hex}
-            </div>
-            <div>
-                <strong>RGB:</strong> rgb(${color.r}, ${color.g}, ${color.b})
-            </div>
-            <div>
-                <strong>HSL:</strong> hsl(${Math.round(color.hsl.h)}°, ${Math.round(color.hsl.s)}%, ${Math.round(color.hsl.l)}%)
-            </div>
-            <div style="background: ${color.hex}; height: 60px; border-radius: 5px; grid-column: 1 / -1; margin-top: 10px;"></div>
-        `;
-    }
-
-    addToPalette(color) {
-        // Check if color already exists
-        const exists = this.appState.palette.some(c => c.hex === color.hex);
-        if (exists) return;
-
-        // Add to palette (max 8 colors)
-        if (this.appState.palette.length >= 8) {
-            this.appState.palette.shift();
+    toggleParticles() {
+        // 切换前景粒子显示/隐藏
+        const canvas = this.particleLayer.canvas;
+        const btn = document.getElementById('toggle-particles');
+        
+        if (canvas.style.opacity === '0') {
+            // 显示粒子
+            canvas.style.opacity = '1';
+            DOMUtils.removeClass(btn, 'active');
+            console.log('✨ Particles shown');
+        } else {
+            // 隐藏粒子
+            canvas.style.opacity = '0';
+            DOMUtils.addClass(btn, 'active');
+            console.log('✨ Particles hidden');
         }
-        this.appState.palette.push(color);
-
-        // Update UI
-        this.renderPalette();
-
-        // Save to storage
-        StorageUtils.savePalette(this.appState.palette);
     }
 
-    renderPalette() {
-        if (!this.elements.paletteColors) return;
-
-        this.elements.paletteColors.innerHTML = this.appState.palette
-            .map(color => `
-                <div class="palette-color" 
-                     style="background: ${color.hex}" 
-                     data-hex="${color.hex}"
-                     title="Click to copy: ${color.hex}">
-                </div>
-            `)
-            .join('');
-
-        // Add click event listeners to copy color
-        this.elements.paletteColors.querySelectorAll('.palette-color').forEach(colorEl => {
-            colorEl.addEventListener('click', () => {
-                const hex = colorEl.dataset.hex;
-                this.copyColorToClipboard(hex, colorEl);
-            });
-        });
-    }
-
-    copyColorToClipboard(hex, element) {
-        // Copy to clipboard
-        navigator.clipboard.writeText(hex).then(() => {
-            // Show success feedback
-            this.showCopyFeedback(element, hex);
-        }).catch(err => {
-            console.error('Failed to copy color:', err);
-            // Fallback for older browsers
-            this.fallbackCopyToClipboard(hex, element);
-        });
-    }
-
-    fallbackCopyToClipboard(hex, element) {
-        // Fallback method for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = hex;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        
-        try {
-            document.execCommand('copy');
-            this.showCopyFeedback(element, hex);
-        } catch (err) {
-            console.error('Fallback copy failed:', err);
-        }
-        
-        document.body.removeChild(textArea);
-    }
-
-    showCopyFeedback(element, hex) {
-        // Create floating notification
-        const notification = document.createElement('div');
-        notification.className = 'copy-notification';
-        notification.textContent = `Copied: ${hex}`;
-        notification.style.cssText = `
-            position: fixed;
-            left: ${element.getBoundingClientRect().left}px;
-            top: ${element.getBoundingClientRect().top - 40}px;
-            background: rgba(0, 243, 255, 0.9);
-            color: #000;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            z-index: 10000;
-            pointer-events: none;
-            animation: copyFadeOut 1.5s ease-out forwards;
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
-        `;
-        
-        document.body.appendChild(notification);
-
-        // Add pulse effect to the color block
-        element.style.transform = 'scale(1.2)';
-        element.style.boxShadow = '0 0 30px rgba(0, 243, 255, 0.8)';
-        
-        setTimeout(() => {
-            element.style.transform = '';
-            element.style.boxShadow = '';
-        }, 300);
-
-        // Remove notification after animation
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 1500);
-    }
-
-    loadPalette() {
-        this.appState.palette = StorageUtils.loadPalette();
-        this.renderPalette();
-    }
+    // Palette functionality removed
 
     animate() {
         requestAnimationFrame(() => this.animate());
@@ -436,7 +314,7 @@ class CosmicLabApp {
     dispose() {
         this.galaxyLayer.dispose();
         this.particleLayer.dispose();
-        this.colorCube.dispose();
+        this.colorCubeBackground.dispose();
         this.eventBus.clear();
         this.animController.cancelAll();
     }

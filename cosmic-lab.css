@@ -33,7 +33,7 @@ body {
   width: 100%;
   height: 100%;
   z-index: 1;
-  display: none; /* 隐藏星系背景 */
+  /* display: none; 隐藏星系背景 */
 }
 
 /* Layer 2: Color Cube Background */
@@ -44,7 +44,7 @@ body {
   width: 100%;
   height: 100%;
   z-index: 2;
-  pointer-events: none;
+  pointer-events: auto; /* 允许鼠标交互 */
 }
 
 /* Layer 3: Particle Canvas */
@@ -56,6 +56,7 @@ body {
   height: 100%;
   z-index: 3;
   pointer-events: none;
+  transition: opacity 0.5s ease;
 }
 
 /* Layer 4: UI Overlay */
@@ -154,38 +155,7 @@ h1.glitch::after {
   text-shadow: 0 0 20px rgba(188, 19, 254, 0.5);
 }
 
-/* ===== CONTROLS INFO ===== */
-
-.controls-info {
-  position: absolute;
-  bottom: 40px;
-  left: 40px;
-  display: flex;
-  gap: 20px;
-  flex-direction: column;
-}
-
-.control-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 8px 16px;
-  border-radius: 30px;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.control-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--primary-color);
-}
-
-.icon {
-  font-size: 1.2rem;
-}
+/* Controls info removed - using action buttons instead */
 
 /* ===== STATS ===== */
 
@@ -216,83 +186,74 @@ h1.glitch::after {
 /* ===== PARTICLE MODE SELECTOR (REMOVED) ===== */
 /* Particle mode selector has been removed - using Spectrum mode only */
 
-/* ===== COLOR PALETTE ===== */
+/* ===== MODEL SELECTOR ===== */
+/* ===== ACTION BUTTONS ===== */
 
-.color-palette {
+.action-buttons {
   position: absolute;
-  top: 180px;
-  left: 40px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 20px;
-  border-radius: 15px;
-  backdrop-filter: blur(15px);
-  border: 2px solid rgba(0, 243, 255, 0.3);
-  min-width: 180px;
-  box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
-}
-
-.palette-title {
-  font-size: 0.8rem;
-  color: var(--primary-color);
-  margin-bottom: 12px;
-  letter-spacing: 3px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.palette-colors {
+  bottom: 30px;
+  left: 30px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 15px;
+  z-index: 10;
 }
 
-.palette-color {
-  width: 100%;
-  height: 40px;
-  border-radius: 5px;
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(0, 243, 255, 0.3);
+  border-radius: 25px;
+  padding: 10px 20px;
   cursor: pointer;
   transition: all 0.3s ease;
-  border: 2px solid transparent;
-  position: relative;
-  overflow: hidden;
+  backdrop-filter: blur(10px);
+  font-family: var(--font-body);
+  color: var(--text-main);
+  font-size: 0.9rem;
 }
 
-.palette-color:hover {
-  border-color: white;
-  transform: scale(1.05);
+.action-btn:hover {
+  background: rgba(0, 243, 255, 0.1);
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 243, 255, 0.3);
 }
 
-.palette-color::after {
-  content: attr(data-hex);
-  position: absolute;
-  bottom: 5px;
-  right: 5px;
-  font-size: 0.7rem;
-  color: white;
-  text-shadow: 0 0 3px black;
-  opacity: 0;
-  transition: opacity 0.3s;
-  font-family: "Courier New", monospace;
-  font-weight: 700;
+.action-btn:active {
+  transform: translateY(0);
 }
 
-.palette-color:hover::after {
-  opacity: 1;
+.btn-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
 }
 
-/* Click indicator */
-.palette-color::before {
-  content: "📋";
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  font-size: 1rem;
-  opacity: 0;
-  transition: opacity 0.3s;
+.btn-label {
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
-.palette-color:hover::before {
-  opacity: 0.8;
+.action-btn.active {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: var(--primary-color);
+}
+
+.action-btn.active .btn-icon {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+  pointer-events: none;
 }
 
 /* ===== MODAL (3D Color Cube) ===== */
