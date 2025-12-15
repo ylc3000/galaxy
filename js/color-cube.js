@@ -14,7 +14,7 @@ export class ColorCube {
         this.config = {
             cubeSize: 100,
             particleSize: 2.5,
-            growthDuration: 2000,      // 生长动画时长（毫秒）
+            growthDuration: 4000,      // 生长动画时长（毫秒）- 4 秒更平滑
             repulsionRadius: 400,      // 排斥半径（增大到 400）
             repulsionForce: 2.0        // 排斥力度（增大到 2.0）
         };
@@ -221,8 +221,14 @@ export class ColorCube {
         const elapsed = Date.now() - this.growthStartTime;
         this.growthProgress = Math.min(elapsed / this.config.growthDuration, 1);
         
-        // 使用缓动函数（ease-out-cubic）
-        const eased = 1 - Math.pow(1 - this.growthProgress, 3);
+        // 使用缓动函数（ease-in-out-quart）- 更平滑的生长曲线
+        // 缓慢启动 → 中间加速 → 缓慢结束
+        let eased;
+        if (this.growthProgress < 0.5) {
+            eased = 8 * Math.pow(this.growthProgress, 4);
+        } else {
+            eased = 1 - Math.pow(-2 * this.growthProgress + 2, 4) / 2;
+        }
         this.currentScale = eased;
         
         // 更新立方体和粒子的缩放
