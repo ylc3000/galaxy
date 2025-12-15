@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙创生：慢速宏大模拟 (Grand Slow Motion Simulation)</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        #canvas {
+            display: block;
+        }
+
+        /* 电影字幕风格的 UI */
+        .ui-container {
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #status {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 16px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            font-weight: 300;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            transition: opacity 1s;
+        }
+
+        #timer {
+            color: rgba(100, 200, 255, 0.6);
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .btn-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+        }
+
+        button {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 20px 50px;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.8s ease;
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: #fff;
+            box-shadow: 0 0 30px rgba(255,255,255,0.2);
+        }
+
+        .fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 纯白闪光层 */
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flash"></div>
+
+    <div class="ui-container">
+        <div id="status">准备启动创世程序</div>
+        <div id="timer">T - 0.00 GYR</div>
+    </div>
+
+    <div class="btn-container" id="btn-box">
+        <button onclick="startUniverse()">启动奇点</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const timerEl = document.getElementById('timer');
+        const flashEl = document.getElementById('flash');
+        const btnBox = document.getElementById('btn-box');
+
+        let width, height;
+        let particles = [];
+        let galaxies = [];
+        let simulationTime = 0;
+        let isRunning = false;
+        
+        // --- 核心配置参数 ---
+        const CONFIG = {
+            particleCount: 4000,      // 粒子总数
+            galaxyCount: 18,          // 星系数量 (增加数量)
+            galaxyMinDist: 250,       // 星系间最小距离 (防止重叠)
+            simSpeed: 0.02,           // 模拟速度 (越小越慢)
+            expansionForce: 25,       // 爆炸初始力度
+            drag: 0.96,               // 空间阻力 (越大阻力越小)
+            cameraZoomSpeed: 0.05,    // 镜头拉远速度
+        };
+
+        // 视口变换 (模拟摄像机)
+        let camera = { x: 0, y: 0, scale: 1.5 }; // 初始放大，看奇点
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 辅助：生成高斯分布的随机数 (让星系中心更亮)
+        function randomGaussian() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random(); 
+            while(v === 0) v = Math.random();
+            return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+        }
+
+        // --- 星系结构类 ---
+        class Galaxy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.type = Math.random() > 0.4 ? 'spiral' : 'elliptical';
+                this.size = Math.random() * 80 + 100; // 星系大小
+                this.tilt = Math.random() * 0.6 + 0.4; // 倾角
+                this.rotationSpeed = (Math.random() * 0.02 + 0.01) * (Math.random() > 0.5 ? 1 : -1);
+                
+                // 颜色风格
+                const colorSchemes = [
+                    { core: '#ffddaa', arm: '#aaccff' }, // 金核蓝臂 (典型)
+                    { core: '#ffaaaa', arm: '#ffcccc' }, // 红色古老星系
+                    { core: '#ffffff', arm: '#eeeeff' }  // 活跃星系
+                ];
+                this.colors = colorSchemes[Math.floor(Math.random() * colorSchemes.length)];
+            }
+
+            // 绘制星系背景光晕 (让星系看起来更饱满)
+            drawGlow(ctx) {
+                // 只有在形成后才显示光晕
+                if (simulationTime < 15) return;
+                
+                let opacity = Math.min((simulationTime - 15) / 10, 0.4); // 慢慢浮现
+
+                // 简单的径向渐变
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 1.5);
+                gradient.addColorStop(0, hexToRgba(this.colors.core, opacity));
+                gradient.addColorStop(0.4, hexToRgba(this.colors.arm, opacity * 0.5));
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                // 稍微压扁一点模拟透视
+                ctx.ellipse(this.x, this.y, this.size * 1.5, this.size * 1.5 * this.tilt, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // --- 恒星粒子类 ---
+        class Star {
+            constructor() {
+                // 初始都在屏幕中心 (奇点)
+                this.x = 0; 
+                this.y = 0;
+                
+                // 爆炸初始速度向量
+                const angle = Math.random() * Math.PI * 2;
+                // 能量分布：大部分粒子速度快，少部分慢
+                const speed = Math.pow(Math.random(), 2) * CONFIG.expansionForce; 
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.targetGalaxy = null; // 归属星系
+                this.orbitRadius = 0;     // 最终轨道半径
+                this.orbitAngle = 0;      // 当前轨道角度
+                this.isLocked = false;    // 是否已进入稳定轨道
+                
+                this.size = Math.random() * 1.5 + 0.5;
+                this.color = '#fff';
+            }
+
+            update() {
+                // --- 阶段1: 暴胀与减速 (0 - 10秒) ---
+                // 这是一个漫长的过程，粒子飞散并慢慢停下来
+                if (simulationTime < 12) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    // 阻力
+                    this.vx *= CONFIG.drag;
+                    this.vy *= CONFIG.drag;
+                }
+                
+                // --- 阶段2: 引力捕获与迁移 (12 - 25秒) ---
+                // 粒子开始向最近的星系中心漂移
+                else if (simulationTime < 25) {
+                    if (!this.targetGalaxy) return;
+
+                    const dx = this.targetGalaxy.x - this.x;
+                    const dy = this.targetGalaxy.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    // 越近引力越强，但有一个上限防止飞出
+                    const force = 30 / (dist + 10);
+                    
+                    // 施加引力
+                    this.vx += (dx / dist) * force * 0.05;
+                    this.vy += (dy / dist) * force * 0.05;
+                    
+                    // 施加旋转力矩 (让它们开始绕圈而不是直冲中心)
+                    this.vx += -dy * 0.0005;
+                    this.vy += dx * 0.0005;
+
+                    // 强阻力，为了让它们“落”入轨道
+                    this.vx *= 0.92; 
+                    this.vy *= 0.92;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+                }
+                
+                // --- 阶段3: 稳定轨道 (25秒+) ---
+                // 强制锁定到完美的几何轨道上，模拟数十亿年的演化结果
+                else {
+                    if (!this.targetGalaxy) return;
+
+                    if (!this.isLocked) {
+                        // 锁定瞬间，计算它是离中心多远
+                        const dx = this.x - this.targetGalaxy.x;
+                        const dy = this.y - this.targetGalaxy.y;
+                        
+                        // 使用高斯分布重置一下半径，让星系中心更亮，边缘更暗
+                        let gDist = Math.abs(randomGaussian()); 
+                        if (gDist > 3) gDist = 3;
+                        this.orbitRadius = (gDist / 3) * this.targetGalaxy.size; 
+                        
+                        this.orbitAngle = Math.atan2(dy, dx);
+                        this.isLocked = true;
+                        
+                        // 确定最终颜色
+                        const distRatio = this.orbitRadius / this.targetGalaxy.size;
+                        if (distRatio < 0.3) this.color = this.targetGalaxy.colors.core;
+                        else this.color = this.targetGalaxy.colors.arm;
+                    }
+
+                    // 轨道运动逻辑
+                    // 靠近核心转得快
+                    const speed = (20 / (this.orbitRadius + 20)) * this.targetGalaxy.rotationSpeed * 50;
+                    this.orbitAngle += speed * CONFIG.simSpeed;
+
+                    // 旋涡星系的旋臂偏移
+                    let armOffset = 0;
+                    if (this.targetGalaxy.type === 'spiral') {
+                        armOffset = this.orbitRadius * 0.05; 
+                    }
+                    
+                    const finalAngle = this.orbitAngle - armOffset;
+
+                    // 计算位置 (考虑倾角)
+                    const rx = Math.cos(finalAngle) * this.orbitRadius;
+                    const ry = Math.sin(finalAngle) * this.orbitRadius * this.targetGalaxy.tilt;
+
+                    this.x = this.targetGalaxy.x + rx;
+                    this.y = this.targetGalaxy.y + ry;
+                }
+            }
+
+            draw(ctx) {
+                // 简单的颜色混合
+                if (simulationTime < 5) ctx.fillStyle = '#fff'; // 初始全白
+                else if (simulationTime < 15) ctx.fillStyle = '#ffaa55'; // 冷却变红
+                else ctx.fillStyle = this.color; // 最终颜色
+
+                // 根据相机缩放调整大小
+                let renderSize = this.size;
+                if (camera.scale < 1) renderSize = Math.max(0.5, this.size * camera.scale);
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, renderSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // --- 初始化逻辑 ---
+        function initGalaxies() {
+            galaxies = [];
+            let attempts = 0;
+            
+            // 为了让星系分布合理，我们生成一个很大的范围，然后只取合适的
+            // 范围是屏幕的 3倍大，这样缩小时周围也有星系
+            const range = Math.max(width, height) * 1.5;
+
+            while (galaxies.length < CONFIG.galaxyCount && attempts < 1000) {
+                attempts++;
+                
+                // 随机坐标 (-range 到 +range)
+                const gx = (Math.random() - 0.5) * 2 * range;
+                const gy = (Math.random() - 0.5) * 2 * range;
+
+                // 距离检查 (排斥算法)
+                let tooClose = false;
+                for (let other of galaxies) {
+                    const d = Math.hypot(gx - other.x, gy - other.y);
+                    if (d < CONFIG.galaxyMinDist) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                
+                // 还要避免离中心太近（中心是大爆炸点，留空一点比较好看）
+                if (Math.hypot(gx, gy) < 100) tooClose = true;
+
+                if (!tooClose) {
+                    galaxies.push(new Galaxy(gx, gy));
+                }
+            }
+        }
+
+        function assignParticlesToGalaxies() {
+            // 为每个粒子预先分配一个最近的星系，方便后续引力计算
+            particles.forEach(p => {
+                let minDist = Infinity;
+                let target = null;
+                for (let g of galaxies) {
+                    // 这里计算的是大爆炸中心(0,0)到星系中心的距离
+                    // 实际上我们是根据粒子飞行的方向来分配
+                    // 为了简化，我们让粒子飞向与它初始速度向量方向一致的象限里的星系
+                    // 但最简单的方法是：遍历所有星系，找一个距离粒子"未来位置"最近的
+                    
+                    // 这里我们采用一种简单的分配：直接找几何距离最近的
+                    // 由于粒子初始都在(0,0)，我们用它们的初始速度方向来预判
+                    const angleP = Math.atan2(p.vy, p.vx);
+                    const angleG = Math.atan2(g.y, g.x);
+                    
+                    // 比较角度差
+                    let diff = Math.abs(angleP - angleG);
+                    if (diff > Math.PI) diff = 2 * Math.PI - diff;
+                    
+                    // 结合距离因子 (让分布更自然)
+                    const distG = Math.hypot(g.x, g.y);
+                    const score = diff * 1000 + distG; 
+
+                    if (score < minDist) {
+                        minDist = score;
+                        target = g;
+                    }
+                }
+                p.targetGalaxy = target;
+            });
+        }
+
+        // --- 主循环 ---
+        function animate() {
+            if (!isRunning) return;
+
+            // 1. 更新时间
+            simulationTime += CONFIG.simSpeed;
+            
+            // 2. 更新相机 (缓慢拉远)
+            if (simulationTime > 5) {
+                // 目标是缩小到 0.4 倍
+                if (camera.scale > 0.4) {
+                    camera.scale -= 0.0005; 
+                }
+                // 缓慢旋转相机视角
+                // ctx.rotate 比较麻烦，这里我们让物体坐标反向移动也可以，但这里暂不旋转相机，只缩放
+            }
+
+            // 3. UI 更新
+            if (simulationTime < 8) {
+                statusEl.innerText = "阶段 I: 暴胀 (INFLATION)";
+                statusEl.style.color = "#fff";
+            } else if (simulationTime < 25) {
+                statusEl.innerText = "阶段 II: 黑暗时代与引力聚合 (GRAVITY WELLS)";
+                statusEl.style.color = "#ff8800";
+            } else if (simulationTime < 35) {
+                statusEl.innerText = "阶段 III: 第一代恒星点亮 (IGNITION)";
+                statusEl.style.color = "#ffffaa";
+            } else {
+                statusEl.innerText = "阶段 IV: 星系演化 (STABLE UNIVERSE)";
+                statusEl.style.color = "#aaaaff";
+            }
+            timerEl.innerText = `T + ${(simulationTime * 0.5).toFixed(2)} 亿年`;
+
+            // 4. 清屏 (带轻微拖尾)
+            // 深空黑，透明度越低拖尾越长
+            let trail = 0.15;
+            if (simulationTime > 30) trail = 0.5; // 稳定后不需要太长拖尾，清晰为主
+            
+            ctx.fillStyle = `rgba(5, 5, 8, ${trail})`;
+            ctx.fillRect(0, 0, width, height);
+
+            // 5. 应用相机变换
+            ctx.save();
+            ctx.translate(width / 2, height / 2); // 原点移到屏幕中心
+            ctx.scale(camera.scale, camera.scale);
+
+            // 6. 绘制星系光晕 (底层)
+            // 混合模式：叠加，让光晕更自然
+            ctx.globalCompositeOperation = 'lighter'; 
+            galaxies.forEach(g => g.drawGlow(ctx));
+            
+            // 7. 更新并绘制粒子
+            // 爆炸初期用 lighter 让中心极亮，后期用 source-over 让颜色显现
+            if (simulationTime > 15) ctx.globalCompositeOperation = 'source-over';
+            
+            particles.forEach(p => {
+                p.update();
+                p.draw(ctx);
+            });
+
+            ctx.restore();
+
+            requestAnimationFrame(animate);
+        }
+
+        function startUniverse() {
+            // UI 隐藏
+            btnBox.classList.add('fade-out');
+            
+            // 初始化数据
+            initGalaxies();
+            
+            particles = [];
+            for(let i=0; i<CONFIG.particleCount; i++) {
+                particles.push(new Star());
+            }
+            
+            assignParticlesToGalaxies();
+
+            isRunning = true;
+            
+            // 闪光特效
+            flashEl.style.transition = 'opacity 0.05s';
+            flashEl.style.opacity = 1;
+            setTimeout(() => {
+                flashEl.style.transition = 'opacity 4s ease-out'; // 慢慢消散
+                flashEl.style.opacity = 0;
+            }, 100);
+
+            animate();
+        }
+
+        // 工具函数
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+    </script>
+</body>
+</html>

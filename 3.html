@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mono-Focus | Design Blog</title>
+    
+    <!-- 引入高品质字体：Playfair Display (衬线) 和 Inter (无衬线) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- 1. 全局变量与重置 (Design Tokens) --- */
+        :root {
+            --bg-color: #F7F5F2; /* 纸张米白 */
+            --text-main: #1C1C1E; /* 深碳色 */
+            --text-muted: #6E6E73; /* 柔和灰 */
+            --accent-color: #4F46E5; /* 靛蓝点缀 */
+            --card-bg: #FFFFFF;
+            --grid-gap: 24px;
+            --radius-lg: 20px;
+            --radius-full: 999px;
+            --transition-smooth: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); /* 丝滑缓动 */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: none; /* 隐藏默认光标，使用自定义光标 */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* --- 2. 自定义反色光标 (Interactive Cursor) --- */
+        #cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--text-main);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s, background-color 0.3s;
+            mix-blend-mode: difference; /* 关键：反色效果 */
+        }
+        
+        #cursor.hovered {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border-color: transparent;
+        }
+
+        /* --- 3. 页面容器 --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* --- 4. 悬浮导航 (Floating Glass Header) --- */
+        header {
+            position: fixed;
+            bottom: 30px; /* 放在底部更独特，方便单手操作 */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px); /* 毛玻璃 */
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 30px;
+            border-radius: var(--radius-full);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            z-index: 100;
+            border: 1px solid rgba(255,255,255,0.5);
+            display: flex;
+            gap: 30px;
+        }
+
+        header a {
+            text-decoration: none;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            font-weight: 500;
+            position: relative;
+        }
+
+        header a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: var(--text-main);
+            transition: width 0.3s ease, left 0.3s ease;
+        }
+
+        header a:hover::after {
+            width: 100%;
+            left: 0;
+        }
+
+        /* --- 5. 首屏大字 (Typography Hero) --- */
+        .hero {
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 8vw, 6rem); /* 响应式大字 */
+            font-weight: 400;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.2s;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            max-width: 500px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.4s;
+        }
+
+        /* --- 6. Bento Grid 布局核心 --- */
+        .grid-section {
+            padding: 100px 0;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            margin-bottom: 40px;
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 350px);
+            gap: var(--grid-gap);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: var(--transition-smooth);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 6px rgba(0,0,0,0); /* 默认无阴影 */
+        }
+
+        .card:hover {
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08); /* 悬浮阴影 */
+        }
+
+        /* 跨度类 */
+        .span-2 { grid-column: span 2; }
+        .row-2 { grid-row: span 2; }
+
+        /* 卡片内容样式 */
+        .card-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            transition: transform 0.8s ease;
+        }
+
+        .card:hover .card-image {
+            transform: scale(1.05);
+        }
+
+        .card-content {
+            position: relative;
+            z-index: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        
+        /* 针对纯图卡片的遮罩 */
+        .card.has-image .card-content {
+            background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+            margin: -30px;
+            padding: 30px;
+            color: white;
+        }
+
+        .card-tag {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+
+        .card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 1024px) {
+            .bento-grid {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .bento-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero h1 {
+                font-size: 3rem;
+            }
+            /* 移动端恢复原生光标，体验更好 */
+            * { cursor: auto; }
+            #cursor { display: none; }
+        }
+
+        /* 动画关键帧 */
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 滚动出现类 */
+        .reveal {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s ease-out;
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 自定义光标 -->
+    <div id="cursor"></div>
+
+    <!-- 悬浮导航 -->
+    <header>
+        <a href="#" class="hover-trigger">Home</a>
+        <a href="#" class="hover-trigger">Essays</a>
+        <a href="#" class="hover-trigger">Works</a>
+        <a href="#" class="hover-trigger">About</a>
+    </header>
+
+    <div class="container">
+        <!-- 首屏 Hero -->
+        <section class="hero">
+            <h1>Digital Gardener,<br>Curating Ideas.</h1>
+            <p>你好，我是设计师。在这里，我种植代码，修剪像素，记录关于美学与技术的思考。</p>
+        </section>
+
+        <!-- Bento Grid 内容区 -->
+        <section class="grid-section">
+            <h2 class="section-title reveal">Latest Thoughts</h2>
+            
+            <div class="bento-grid">
+                
+                <!-- 卡片 1: 大图主推 (跨2列，跨2行) -->
+                <article class="card span-2 row-2 has-image reveal hover-trigger">
+                    <img src="https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" alt="Mountain" class="card-image">
+                    <div class="card-content">
+                        <span class="card-tag">Featured</span>
+                        <h3 class="card-title">The Art of Negative Space in Modern Web Design</h3>
+                    </div>
+                </article>
+
+                <!-- 卡片 2: 纯文字思考 -->
+                <article class="card reveal hover-trigger">
+                    <div class="card-content">
+                        <span class="card-tag" style="color: var(--accent-color)">Journal</span>
+                        <h3 class="card-title">Less is more, but "Less" is harder.</h3>
+                        <p style="margin-top:15px; font-size: 0.9rem; color: var(--text-muted)">Minimalism isn't about removing things, it's about adding meaning.</p>
+                    </div>
+                </article>
+
+                <!-- 卡片 3: 状态/音乐 -->
+                <article class="card reveal hover-trigger" style="background: #1DB954; color: white;">
+                    <div class="card-content">
+                        <span class="card-tag">Now Playing</span>
+                        <h3 class="card-title" style="font-size: 1.2rem;">Cornfield Chase - Hans Zimmer</h3>
+                        <div style="margin-top: 10px; display: flex; gap: 5px;">
+                            <span style="height: 20px; width: 4px; background: white; animation: bounce 1s infinite;"></span>
+                            <span style="height: 20px; width: 4px; background: white; animation: bounce 1.2s infinite;"></span>
+                            <span style="height: 20px; width: 4px; background: white; animation: bounce 0.8s infinite;"></span>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- 卡片 4: 摄影作品 -->
+                <article class="card span-2 reveal hover-trigger has-image">
+                    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Abstract" class="card-image">
+                    <div class="card-content">
+                        <span class="card-tag">Photography</span>
+                        <h3 class="card-title">Patterns in Chaos</h3>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+        
+        <!-- 简单的页脚 -->
+        <footer style="padding: 50px 0; border-top: 1px solid #e5e5e5; margin-top: 50px; text-align: center; color: var(--text-muted)">
+            <p>&copy; 2024 The Mono-Focus. Designed by You.</p>
+        </footer>
+    </div>
+
+    <style>
+        @keyframes bounce {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+    </style>
+
+    <script>
+        // --- JS 交互逻辑 ---
+
+        // 1. 自定义光标逻辑
+        const cursor = document.getElementById('cursor');
+        const hoverTriggers = document.querySelectorAll('.hover-trigger');
+
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+        });
+
+        hoverTriggers.forEach(link => {
+            link.addEventListener('mouseenter', () => {
+                cursor.classList.add('hovered');
+            });
+            link.addEventListener('mouseleave', () => {
+                cursor.classList.remove('hovered');
+            });
+        });
+
+        // 2. 滚动元素显现 (Scroll Reveal)
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

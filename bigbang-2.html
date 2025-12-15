@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙演化模拟：从大爆炸到星系</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        #canvas {
+            display: block;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+        }
+
+        .hud-text {
+            margin: 5px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #time-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ffcc;
+        }
+
+        #phase-display {
+            color: #ff9900;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 10;
+        }
+
+        button {
+            background: rgba(0, 255, 204, 0.1);
+            color: #00ffcc;
+            border: 1px solid #00ffcc;
+            padding: 12px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button:hover {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 20;
+            transition: opacity 0.1s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flash"></div>
+
+    <div id="overlay">
+        <div id="time-display" class="hud-text">T+ 0.00s</div>
+        <div id="phase-display" class="hud-text">状态: 奇点 (等待启动)</div>
+        <div id="count-display" class="hud-text">粒子数: 0</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="controls">
+        <button id="start-btn">启动大爆炸</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let particles = [];
+        let centers = []; // 引力中心（模拟星系核/暗物质团块）
+        let animationId;
+        let startTime = 0;
+        let isRunning = false;
+        
+        // 模拟参数
+        const PARTICLE_COUNT = 3500;
+        const CENTER_COUNT = 5; // 最终形成的星系数量
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 颜色映射
+        function getColor(temp, alpha) {
+            // 简单的热度颜色模拟：高热(蓝白) -> 中热(黄) -> 低热(红) -> 冷却(灰/紫)
+            if (temp > 0.8) return `rgba(200, 240, 255, ${alpha})`; // 极热
+            if (temp > 0.6) return `rgba(255, 255, 200, ${alpha})`; // 热
+            if (temp > 0.4) return `rgba(255, 100, 50, ${alpha})`;  // 温
+            if (temp > 0.2) return `rgba(150, 50, 100, ${alpha})`;  // 冷
+            return `rgba(100, 100, 150, ${alpha})`;                // 尘埃
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = width / 2;
+                this.y = height / 2;
+                
+                // 爆炸初始速度
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * Math.random() * 25; // 能量分布不均
+                this.vx = Math.cos(angle) * force;
+                this.vy = Math.sin(angle) * force;
+                
+                this.life = 1;
+                this.temp = 1.0; // 温度 1.0 = 最高
+                this.size = Math.random() * 2 + 0.5;
+                
+                // 归属的星系中心 (稍后分配)
+                this.targetCenter = null;
+                this.inOrbit = false;
+            }
+
+            update(dt, timeElapsed) {
+                // 1. 暴胀阶段 (0-3秒)：纯粹的惯性移动，阻力极小
+                if (timeElapsed < 3) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.96; // 快速减速，模拟空间膨胀阻力
+                    this.vy *= 0.96;
+                    this.temp = Math.max(0.2, this.temp - 0.005); // 快速冷却
+                } 
+                // 2. 引力聚合阶段 (3-8秒)：开始受引力影响
+                else if (timeElapsed < 8) {
+                    // 如果还没有分配引力中心，分配一个最近的
+                    if (!this.targetCenter) {
+                        let minDist = Infinity;
+                        for(let c of centers) {
+                            let d = Math.hypot(c.x - this.x, c.y - this.y);
+                            if (d < minDist) {
+                                minDist = d;
+                                this.targetCenter = c;
+                            }
+                        }
+                    }
+
+                    // 引力计算
+                    if (this.targetCenter) {
+                        const dx = this.targetCenter.x - this.x;
+                        const dy = this.targetCenter.y - this.y;
+                        const dist = Math.hypot(dx, dy);
+                        
+                        // 引力公式简化：离得越近吸力越大，但限制最大力防止飞出
+                        const force = 150 / (dist * dist + 100); 
+                        
+                        // 施加向心力
+                        this.vx += (dx / dist) * force;
+                        this.vy += (dy / dist) * force;
+                        
+                        // 施加一点旋转力 (Coriolis/Angular Momentum)
+                        // 根据中心点的旋转方向施加切向力
+                        const rotateForce = 0.02; 
+                        this.vx += -(dy / dist) * rotateForce * this.targetCenter.spinDir;
+                        this.vy += (dx / dist) * rotateForce * this.targetCenter.spinDir;
+                    }
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.98; // 阻力减小
+                    this.vy *= 0.98;
+                    this.temp = Math.max(0.5, this.temp + 0.001); // 聚变重燃，温度略回升
+                }
+                // 3. 稳定轨道阶段 (8秒+)：形成稳定旋转
+                else {
+                    if (this.targetCenter) {
+                         const dx = this.targetCenter.x - this.x;
+                         const dy = this.targetCenter.y - this.y;
+                         const dist = Math.hypot(dx, dy);
+
+                         // 模拟完美的轨道力学太复杂，这里使用“旋流”算法
+                         // 保持距离，同时切向移动
+                         const angle = Math.atan2(dy, dx);
+                         const speed = 2 + (500 / (dist + 100)); // 内圈快，外圈慢
+                         
+                         // 计算理想速度向量 (垂直于半径)
+                         const targetVx = -Math.sin(angle) * speed * this.targetCenter.spinDir;
+                         const targetVy = Math.cos(angle) * speed * this.targetCenter.spinDir;
+
+                         // 平滑过渡到轨道速度
+                         this.vx = this.vx * 0.95 + targetVx * 0.05;
+                         this.vy = this.vy * 0.95 + targetVy * 0.05;
+
+                         // 微弱的向心漂移（吸积）
+                         this.x += this.vx + (dx/dist) * 0.1;
+                         this.y += this.vy + (dy/dist) * 0.1;
+                         
+                         // 恒星闪烁
+                         this.temp = 0.6 + Math.random() * 0.4; 
+                    }
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = getColor(this.temp, 0.8);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 初始化引力中心 (暗物质团块)
+        function initCenters() {
+            centers = [];
+            for(let i=0; i<CENTER_COUNT; i++) {
+                // 随机分布在屏幕各处，不要太靠边
+                centers.push({
+                    x: width/2 + (Math.random() - 0.5) * width * 0.6,
+                    y: height/2 + (Math.random() - 0.5) * height * 0.6,
+                    mass: Math.random() * 50 + 50,
+                    spinDir: Math.random() > 0.5 ? 1 : -1 // 顺时针或逆时针
+                });
+            }
+        }
+
+        function updateHUD(timeElapsed) {
+            const timeEl = document.getElementById('time-display');
+            const phaseEl = document.getElementById('phase-display');
+            
+            timeEl.innerText = `T+ ${timeElapsed.toFixed(2)}s`;
+            
+            if (timeElapsed < 2) {
+                phaseEl.innerText = "阶段: 宇宙暴胀 (INFLATION)";
+                phaseEl.style.color = "#fff";
+            } else if (timeElapsed < 6) {
+                phaseEl.innerText = "阶段: 冷却 & 黑暗时代 (COOLING)";
+                phaseEl.style.color = "#ff3333";
+            } else if (timeElapsed < 10) {
+                phaseEl.innerText = "阶段: 引力聚合 (ACCRETION)";
+                phaseEl.style.color = "#33ff33";
+            } else {
+                phaseEl.innerText = "阶段: 星系形成 (FORMATION COMPLETE)";
+                phaseEl.style.color = "#00ccff";
+            }
+            
+            document.getElementById('count-display').innerText = `粒子数: ${particles.length}`;
+        }
+
+        function loop(timestamp) {
+            if (!isRunning) return;
+            
+            if (!startTime) startTime = timestamp;
+            const timeElapsed = (timestamp - startTime) / 1000; // 秒
+
+            // 拖尾效果
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.2)'; 
+            ctx.fillRect(0, 0, width, height);
+            
+            // 绘制“叠加”模式，让密集的星星看起来更亮
+            ctx.globalCompositeOperation = 'lighter';
+
+            particles.forEach(p => {
+                p.update(0.016, timeElapsed);
+                p.draw();
+            });
+            
+            ctx.globalCompositeOperation = 'source-over';
+            
+            updateHUD(timeElapsed);
+            
+            requestAnimationFrame(loop);
+        }
+
+        function startBigBang() {
+            if (isRunning) return;
+            
+            // 重置
+            particles = [];
+            initCenters();
+            isRunning = true;
+            startTime = 0; // 将在loop中设定
+            document.getElementById('start-btn').style.display = 'none';
+
+            // 生成粒子
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push(new Particle());
+            }
+
+            // 闪光特效
+            const flash = document.getElementById('flash');
+            flash.style.opacity = 1;
+            setTimeout(() => {
+                flash.style.opacity = 0;
+            }, 100);
+
+            requestAnimationFrame(loop);
+        }
+
+        document.getElementById('start-btn').addEventListener('click', startBigBang);
+        
+        // 初始黑屏
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    </script>
+</body>
+</html>

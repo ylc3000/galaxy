@@ -1,0 +1,182 @@
+<!-- 在 <head> 中补充一种等宽字体 -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+<style>
+    /* --- 列表页专用样式 --- */
+    
+    .archive-section {
+        padding: 80px 0;
+        max-width: 900px; /* 列表页稍微窄一点，阅读体验更好 */
+        margin: 0 auto;
+    }
+
+    /* 顶部工具栏：搜索与筛选 */
+    .archive-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 60px;
+        border-bottom: 2px solid var(--text-main);
+        padding-bottom: 20px;
+    }
+
+    .archive-count {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    /* 每一篇文章的行容器 */
+    .article-row {
+        display: grid;
+        /* 定义列宽：日期 | 分类 | 标题(自动撑开) | 箭头 */
+        grid-template-columns: 120px 150px 1fr 50px; 
+        align-items: center;
+        padding: 24px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.1);
+        text-decoration: none;
+        color: var(--text-main);
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    /* 悬停效果 */
+    .article-row:hover {
+        padding-left: 15px; /* 整体轻微右移 */
+        border-bottom: 1px solid var(--text-main); /* 线条变深 */
+    }
+    
+    /* 悬停时标题变色 */
+    .article-row:hover .row-title {
+        color: var(--accent-color);
+    }
+
+    /* 每一列的样式 */
+    .row-date {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .row-category {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 4px 10px;
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 99px;
+        width: fit-content;
+    }
+
+    .row-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.4rem;
+        font-weight: 400;
+        transition: color 0.3s ease;
+    }
+
+    .row-arrow {
+        opacity: 0;
+        transform: translateX(-10px);
+        transition: all 0.3s ease;
+        font-size: 1.2rem;
+    }
+
+    /* 悬停时箭头出现 */
+    .article-row:hover .row-arrow {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+        .article-row {
+            grid-template-columns: 1fr; /* 变成单列 */
+            gap: 8px;
+        }
+        .row-date, .row-category {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .row-arrow {
+            display: none; /* 手机端隐藏箭头 */
+        }
+    }
+    
+    /* 分页按钮 */
+    .load-more {
+        display: block;
+        margin: 60px auto;
+        padding: 15px 40px;
+        background: transparent;
+        border: 1px solid var(--text-main);
+        border-radius: 99px;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.9rem;
+        cursor: none; /* 配合自定义光标 */
+        transition: all 0.3s ease;
+    }
+    
+    .load-more:hover {
+        background: var(--text-main);
+        color: var(--bg-color);
+    }
+
+</style>
+
+<section class="archive-section">
+    <!-- 头部：展示数量 -->
+    <div class="archive-header reveal">
+        <h2 style="font-family: 'Playfair Display', serif; font-size: 2.5rem;">All Writings</h2>
+        <span class="archive-count">[ 034 ]</span>
+    </div>
+
+    <!-- 列表开始 -->
+    <div class="article-list">
+
+        <!-- 文章 1 -->
+        <a href="#" class="article-row reveal hover-trigger">
+            <span class="row-date">2024.12.15</span>
+            <span class="row-category">Design</span>
+            <h3 class="row-title">Understanding Typography in the AI Era</h3>
+            <span class="row-arrow">→</span>
+        </a>
+
+        <!-- 文章 2 -->
+        <a href="#" class="article-row reveal hover-trigger">
+            <span class="row-date">2024.11.02</span>
+            <span class="row-category">Code</span>
+            <h3 class="row-title">Why I switched from React to Vanilla JS</h3>
+            <span class="row-arrow">→</span>
+        </a>
+
+        <!-- 文章 3 -->
+        <a href="#" class="article-row reveal hover-trigger">
+            <span class="row-date">2024.10.28</span>
+            <span class="row-category">Essay</span>
+            <h3 class="row-title">Digital Minimalism: A survival guide</h3>
+            <span class="row-arrow">→</span>
+        </a>
+
+        <!-- 文章 4 -->
+        <a href="#" class="article-row reveal hover-trigger">
+            <span class="row-date">2024.09.15</span>
+            <span class="row-category">Design</span>
+            <h3 class="row-title">The psychology of dark mode</h3>
+            <span class="row-arrow">→</span>
+        </a>
+
+        <!-- 文章 5 -->
+        <a href="#" class="article-row reveal hover-trigger">
+            <span class="row-date">2024.08.30</span>
+            <span class="row-category">Photography</span>
+            <h3 class="row-title">Tokyo: A visual diary</h3>
+            <span class="row-arrow">→</span>
+        </a>
+
+    </div>
+
+    <!-- 加载更多 -->
+    <button class="load-more hover-trigger">Load More Writings</button>
+</section>

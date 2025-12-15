@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Color Lab - Interactive Universe</title>
+    <link rel="stylesheet" href="cosmic-lab.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Import Map for Three.js modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.160.0",
+          "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <!-- Layer 1: 3D Galaxy Background (WebGL) -->
+    <div id="galaxy-container"></div>
+
+    <!-- Flash Overlay for Big Bang -->
+    <div id="flash-overlay" class="flash-overlay"></div>
+
+    <!-- Layer 2: 3D Color Cube Background (WebGL) -->
+    <div id="cube-background-container"></div>
+
+    <!-- Layer 3: 2D Particle Foreground (Canvas) -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Layer 4: 3D Color Cube Modal (WebGL) -->
+    <div id="color-cube-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="close-modal">✕</button>
+        <div id="cube-container"></div>
+        <div class="color-info-panel">
+          <h3 id="color-name">Color Analysis</h3>
+          <div class="color-values" id="color-values"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Overlay -->
+    <div class="ui-overlay">
+      <header>
+        <h1 class="glitch" data-text="COSMIC COLOR LAB">COSMIC COLOR LAB</h1>
+        <p class="subtitle">Interactive Universe of Colors</p>
+      </header>
+
+      <div class="mode-indicator">
+        <span class="mode-label">MODE</span>
+        <span class="mode-value" id="mode-display">EXPLORE</span>
+      </div>
+
+      <div class="controls-info">
+        <div class="control-item">
+          <span class="icon">🖱️</span>
+          <span>Move to Explore</span>
+        </div>
+        <div class="control-item">
+          <span class="icon">👆</span>
+          <span>Click to Analyze Colors</span>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <span class="label">PARTICLES</span>
+          <span class="value" id="galaxy-count">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">FPS</span>
+          <span class="value" id="fps-counter">60</span>
+        </div>
+      </div>
+
+      <!-- Color Palette (saved colors) -->
+      <div class="color-palette" id="color-palette">
+        <div class="palette-title">PALETTE</div>
+        <div class="palette-colors" id="palette-colors">
+          <!-- Colors will be added dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>Creating Universe...</p>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/galaxy-layer.js"></script>
+    <script type="module" src="js/particle-layer.js"></script>
+    <script type="module" src="js/color-cube.js"></script>
+    <script type="module" src="js/app-controller.js"></script>
+  </body>
+</html>

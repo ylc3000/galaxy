@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙演化：慢速深空 (Deep Space Slow Motion)</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020202; /* 极深的黑 */
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #canvas {
+            display: block;
+            /* 稍微增加对比度，让慢速下的星光更清晰 */
+            filter: contrast(1.1) brightness(1.1); 
+        }
+
+        /* UI 界面 */
+        .hud-layer {
+            position: absolute;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 30px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .top-info {
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 10px rgba(0, 100, 255, 0.3);
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            font-size: 1.8rem;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #00ffff;
+            letter-spacing: 1px;
+        }
+
+        #timeline-container {
+            width: 300px;
+            height: 2px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 10px;
+            position: relative;
+        }
+
+        #timeline-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #ffffff);
+            box-shadow: 0 0 10px #00ffff;
+            transition: width 0.1s linear;
+        }
+
+        .controls {
+            pointer-events: auto;
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        button {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 18px 50px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all 0.6s ease;
+            backdrop-filter: blur(4px);
+            border-radius: 2px;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #fff;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        /* 闪光层 */
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            z-index: 20;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flash"></div>
+
+    <div class="hud-layer">
+        <div class="top-info">
+            <h1>Deep Universe</h1>
+            <div id="status-text" class="status-bar">SYSTEM READY</div>
+            <div id="timeline-container">
+                <div id="timeline-bar"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="start-btn" onclick="startSimulation()">INITIATE BIG BANG</button>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusText = document.getElementById('status-text');
+        const timelineBar = document.getElementById('timeline-bar');
+        const startBtn = document.getElementById('start-btn');
+        const flash = document.getElementById('flash');
+
+        let width, height;
+        let particles = [];
+        let backgroundStars = []; 
+        let galaxies = []; 
+        let time = 0;
+        let running = false;
+        
+        // --- 慢速控制参数 ---
+        // 速度因子：越小越慢。0.3 表示是原版速度的 30%
+        const SPEED_FACTOR = 0.3; 
+        
+        // 相机漂移参数
+        let cameraOffset = { x: 0, y: 0 };
+        // 漂移也需要变慢
+        let driftSpeed = { x: 0.05 * SPEED_FACTOR, y: 0.02 * SPEED_FACTOR }; 
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const rand = (min, max) => Math.random() * (max - min) + min;
+
+        // 星系核心
+        class GalaxyCore {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.mass = rand(100, 200);
+                this.type = Math.random() > 0.3 ? 'spiral' : 'elliptical'; 
+                this.tilt = rand(0.4, 0.9); 
+                this.color = Math.random() > 0.5 ? '#ffcc99' : '#ccf0ff';
+                // 随机自转方向
+                this.spinDir = Math.random() > 0.5 ? 1 : -1;
+            }
+        }
+
+        // 恒星粒子
+        class Star {
+            constructor() {
+                this.x = width / 2;
+                this.y = height / 2;
+                
+                // 初始速度
+                const angle = Math.random() * Math.PI * 2;
+                // 稍微减小一点初始力度，让画面即使在慢动作下也不会飞出屏幕太远
+                const speed = rand(1, 15); 
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+
+                this.size = rand(0.5, 2.2);
+                this.life = 1;
+                this.color = '#fff';
+                this.targetGalaxy = null;
+                this.orbitRadius = 0;
+                this.orbitAngle = 0;
+                this.orbitSpeed = 0;
+                this.isLocked = false; 
+                
+                this.spectralType = rand(0, 1); 
+            }
+
+            update(dt) {
+                // dt 已经包含了 SPEED_FACTOR，所以这里的物理逻辑不需要改太多
+                // 但是阻力需要调整，否则慢动作下粒子会过早停下来
+                
+                // --- 阶段 1: 暴胀 (0-6s) --- 
+                if (time < 6) {
+                    this.x += this.vx * SPEED_FACTOR;
+                    this.y += this.vy * SPEED_FACTOR;
+                    
+                    // 阻力变小 (0.99 instead of 0.95) 配合慢速，让粒子能滑行更远
+                    this.vx *= 0.99;
+                    this.vy *= 0.99;
+                }
+                // --- 阶段 2: 引力捕获 (6-20s) ---
+                else if (time < 20) {
+                    if (!this.targetGalaxy) {
+                        // 寻找最近的星系中心
+                        let minDist = Infinity;
+                        for (let g of galaxies) {
+                            let d = Math.hypot(g.x - this.x, g.y - this.y);
+                            if (d < minDist) {
+                                minDist = d;
+                                this.targetGalaxy = g;
+                            }
+                        }
+                    }
+
+                    if (this.targetGalaxy) {
+                        const dx = this.targetGalaxy.x - this.x;
+                        const dy = this.targetGalaxy.y - this.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        // 慢速引力
+                        // 吸引力
+                        this.vx += (dx / dist) * 0.8 * SPEED_FACTOR;
+                        this.vy += (dy / dist) * 0.8 * SPEED_FACTOR;
+                        
+                        // 旋转力 (切向力)
+                        const rotForce = 0.005;
+                        this.vx += -dy * rotForce * this.targetGalaxy.spinDir * SPEED_FACTOR;
+                        this.vy += dx * rotForce * this.targetGalaxy.spinDir * SPEED_FACTOR;
+
+                        this.vx *= 0.98; // 适度阻力
+                        this.vy *= 0.98;
+                        
+                        this.x += this.vx * SPEED_FACTOR;
+                        this.y += this.vy * SPEED_FACTOR;
+                    }
+                }
+                // --- 阶段 3: 轨道稳定与深化 (20s+) ---
+                else {
+                    if (this.targetGalaxy && !this.isLocked) {
+                        const dx = this.x - this.targetGalaxy.x;
+                        const dy = this.y - this.targetGalaxy.y;
+                        this.orbitRadius = Math.hypot(dx, dy);
+                        // 如果半径太小（吸进黑洞了），稍微推出来一点，为了视觉效果
+                        if (this.orbitRadius < 10) this.orbitRadius = rand(10, 50);
+
+                        this.orbitAngle = Math.atan2(dy, dx);
+                        
+                        // 轨道速度
+                        this.orbitSpeed = (80 / (this.orbitRadius + 20)) * this.targetGalaxy.spinDir;
+                        if (this.targetGalaxy.type === 'elliptical') this.orbitSpeed *= 0.5;
+
+                        this.isLocked = true;
+                    }
+
+                    if (this.isLocked) {
+                        // 轨道运动 (应用 SPEED_FACTOR)
+                        this.orbitAngle += this.orbitSpeed * 0.05 * SPEED_FACTOR;
+                        
+                        let armOffset = 0;
+                        if (this.targetGalaxy.type === 'spiral') {
+                             armOffset = this.orbitRadius * 0.03;
+                        }
+
+                        const finalAngle = this.orbitAngle - armOffset;
+                        
+                        const rx = Math.cos(finalAngle) * this.orbitRadius;
+                        const ry = Math.sin(finalAngle) * this.orbitRadius * this.targetGalaxy.tilt;
+
+                        // 加上相机漂移
+                        this.x = this.targetGalaxy.x + rx - cameraOffset.x;
+                        this.y = this.targetGalaxy.y + ry - cameraOffset.y;
+                    }
+                }
+            }
+
+            draw() {
+                // 颜色逻辑 (保持V3的优秀配色)
+                let r, g, b, a;
+
+                if (time < 4) {
+                    // 早期：白热
+                    r=255; g=255; b=255; a=1;
+                } else if (time < 15) {
+                    // 冷却期：红橙
+                    // 随着时间推移，a从1降到0.8
+                    r=255; g=160; b=80; a=0.9;
+                } else {
+                    // 现代：光谱色
+                    if (!this.targetGalaxy) return;
+
+                    const distRatio = this.orbitRadius / 200;
+                    
+                    if (distRatio < 0.25) {
+                        // 核心
+                        r=255; g=245; b=220; a=0.95;
+                    } else {
+                        // 旋臂
+                        if (this.spectralType > 0.6) { 
+                            r=160; g=210; b=255; a=0.8; // 蓝巨星
+                        } else if (this.spectralType > 0.3) { 
+                            r=255; g=255; b=240; a=0.6; // 黄矮星
+                        } else { 
+                            r=255; g=100; b=100; a=0.5; // 红矮星
+                        }
+                    }
+                }
+
+                // 慢速版稍微让粒子变小一点点，增加精致感
+                let drawSize = this.size;
+                if (time > 20) drawSize *= 0.8;
+
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+                ctx.arc(this.x, this.y, drawSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class BackgroundStar {
+            constructor() {
+                this.x = rand(0, width);
+                this.y = rand(0, height);
+                this.size = rand(0.5, 1.2);
+                this.alpha = 0;
+                this.targetAlpha = rand(0.2, 0.6);
+            }
+            update() {
+                // 背景浮现
+                if (time > 15) {
+                    if (this.alpha < this.targetAlpha) this.alpha += 0.002 * SPEED_FACTOR;
+                }
+                
+                // 视差移动
+                this.x -= driftSpeed.x * 0.3;
+                this.y -= driftSpeed.y * 0.3;
+                
+                if(this.x < 0) this.x += width;
+                if(this.y < 0) this.y += height;
+            }
+            draw() {
+                if (this.alpha <= 0) return;
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            particles = [];
+            galaxies = [];
+            backgroundStars = [];
+            time = 0;
+            cameraOffset = {x:0, y:0};
+            
+            // --- 星系分布优化 (避免重叠) ---
+            const galaxyCount = Math.floor(width * height / 100000); // 根据屏幕面积决定数量，多一点
+            const minDistance = 200; // 星系间最小距离
+
+            let attempts = 0;
+            while (galaxies.length < galaxyCount && attempts < 1000) {
+                attempts++;
+                // 留出边距
+                let gx = rand(width * 0.1, width * 0.9);
+                let gy = rand(height * 0.1, height * 0.9);
+                
+                // 检查距离
+                let tooClose = false;
+                for (let other of galaxies) {
+                    if (Math.hypot(gx - other.x, gy - other.y) < minDistance) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                // 也别离大爆炸中心(屏幕正中)太近，留个空
+                if (Math.hypot(gx - width/2, gy - height/2) < 100) tooClose = true;
+
+                if (!tooClose) {
+                    galaxies.push(new GalaxyCore(gx, gy));
+                }
+            }
+
+            // 粒子数量
+            for (let i = 0; i < 4500; i++) {
+                particles.push(new Star());
+            }
+            
+            // 背景星数量
+            for (let i = 0; i < 300; i++) {
+                backgroundStars.push(new BackgroundStar());
+            }
+        }
+
+        function startSimulation() {
+            if (running) return;
+            running = true;
+            startBtn.style.opacity = '0';
+            startBtn.style.pointerEvents = 'none';
+            init();
+
+            // 闪光变慢
+            flash.style.transition = 'opacity 0.1s';
+            flash.style.opacity = 1;
+            setTimeout(() => { 
+                flash.style.transition = 'opacity 5s ease-out'; // 5秒慢速消散
+                flash.style.opacity = 0; 
+            }, 200);
+
+            animate();
+        }
+
+        function animate() {
+            if (!running) return;
+            
+            // 时间流逝 (受 SPEED_FACTOR 控制)
+            time += 0.05 * SPEED_FACTOR; 
+
+            // UI 更新
+            // 总流程大概 40秒 (time 0 -> 40)
+            let progress = Math.min((time / 40) * 100, 100);
+            timelineBar.style.width = `${progress}%`;
+
+            if (time < 6) {
+                statusText.innerText = `T+${time.toFixed(2)}s: COSMIC INFLATION`;
+                statusText.style.color = '#fff';
+            }
+            else if (time < 20) {
+                statusText.innerText = `T+${time.toFixed(2)}s: GRAVITATIONAL COLLAPSE`;
+                statusText.style.color = '#ffaa00';
+            }
+            else if (time < 30) {
+                statusText.innerText = `T+${time.toFixed(2)}s: GALACTIC FORMATION`;
+                statusText.style.color = '#aaffaa';
+            }
+            else {
+                statusText.innerText = `MODERN ERA - STABLE UNIVERSE`;
+                statusText.style.color = '#aaaaff';
+                
+                // 只有稳定后才漂移
+                cameraOffset.x += driftSpeed.x;
+                cameraOffset.y += driftSpeed.y;
+            }
+
+            // 绘制背景 (拖尾效果)
+            // 慢动作下，拖尾如果太重会糊，所以稍微淡一点
+            let trail = 0.15; 
+            if (time > 25) trail = 0.4; // 稳定后让背景变黑一点，突出星星
+            
+            ctx.fillStyle = `rgba(2, 2, 5, ${trail})`;
+            ctx.fillRect(0, 0, width, height);
+
+            // 绘制背景深空星
+            backgroundStars.forEach(bg => {
+                bg.update();
+                bg.draw();
+            });
+
+            // 绘制星系光晕 (营造氛围)
+            if (time > 15) {
+                ctx.globalCompositeOperation = 'lighter';
+                galaxies.forEach(g => {
+                    // 随着时间慢慢显现
+                    let alpha = Math.min((time - 15) / 10, 0.15); // 非常淡
+                    
+                    let sx = g.x - cameraOffset.x;
+                    let sy = g.y - cameraOffset.y;
+
+                    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 120);
+                    grad.addColorStop(0, g.color);
+                    grad.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = grad;
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 120, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                });
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            // 更新粒子
+            // 早期高亮叠加
+            if (time < 12) ctx.globalCompositeOperation = 'lighter';
+            else ctx.globalCompositeOperation = 'source-over';
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // 静态初始画面
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, width, height);
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Space Distribution (Meodai Style)</title>
+    <style>
+        :root {
+            --bg: #111;
+            --text: #888;
+            --highlight: #fff;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid #333;
+            backdrop-filter: blur(5px);
+        }
+        button {
+            background: transparent;
+            border: 1px solid #444;
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:hover, button.active {
+            border-color: var(--highlight);
+            color: var(--highlight);
+            background: rgba(255,255,255,0.1);
+        }
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #555;
+            pointer-events: none;
+        }
+        h1 {
+            margin: 0;
+            font-size: 14px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="overlay">
+        <h1>Color Distribution</h1>
+        <p style="font-size: 10px">Interactive Canvas Experiment</p>
+    </div>
+
+    <div class="ui">
+        <button onclick="setMode('spectrum')" class="active" id="btn-spectrum">Spectrum</button>
+        <button onclick="setMode('wheel')" id="btn-wheel">Wheel</button>
+        <button onclick="setMode('cylinder')" id="btn-cylinder">Cylinder</button>
+        <button onclick="setMode('random')" id="btn-random">Chaos</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Configuration
+    const PARTICLE_COUNT = 1800;
+    const EASE = 0.08; // The "smoothness" factor (lower is slower/smoother)
+    let width, height, cx, cy;
+    
+    // State
+    let particles = [];
+    let mouse = { x: -1000, y: -1000 };
+    let currentMode = 'spectrum';
+
+    // --- 1. The Particle Class ---
+    class Particle {
+        constructor() {
+            // Color properties (HSL)
+            this.h = Math.random() * 360;
+            this.s = 40 + Math.random() * 60; // Vibrant colors (40-100%)
+            this.l = 20 + Math.random() * 60; // Visible lightness (20-80%)
+            
+            // Dimensions
+            this.radius = 1.5 + Math.random() * 2;
+            this.baseRadius = this.radius;
+
+            // Position (Current)
+            this.x = Math.random() * window.innerWidth;
+            this.y = Math.random() * window.innerHeight;
+
+            // Position (Target - where it wants to go)
+            this.tx = this.x;
+            this.ty = this.y;
+        }
+
+        update() {
+            // Physics: Move towards target position (Linear Interpolation / Lerp)
+            this.x += (this.tx - this.x) * EASE;
+            this.y += (this.ty - this.y) * EASE;
+
+            // Mouse Interaction: Push away slightly and grow
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Interaction Radius
+            if (dist < 100) {
+                // Scale up
+                this.radius = this.baseRadius * 3;
+                
+                // Subtle repulsion (makes it feel alive)
+                const angle = Math.atan2(dy, dx);
+                this.x -= Math.cos(angle) * 2; 
+                this.y -= Math.sin(angle) * 2; 
+            } else {
+                // Reset size
+                this.radius += (this.baseRadius - this.radius) * 0.1;
+            }
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `hsl(${this.h}, ${this.s}%, ${this.l}%)`;
+            ctx.fill();
+        }
+    }
+
+    // --- 2. Layout Algorithms ---
+    // These functions calculate where every dot should be based on the mode
+    
+    function updateTargets() {
+        particles.forEach(p => {
+            if (currentMode === 'spectrum') {
+                // Map X to Hue, Y to Lightness
+                const padding = 50;
+                p.tx = padding + (p.h / 360) * (width - padding * 2);
+                p.ty = padding + ((100 - p.l) / 100) * (height - padding * 2);
+                
+                // Add slight random jitter so they aren't in perfect lines
+                p.tx += (Math.random() - 0.5) * 10; 
+            
+            } else if (currentMode === 'wheel') {
+                // Polar Coordinates: Angle = Hue, Distance = Saturation
+                const angle = (p.h * Math.PI) / 180;
+                const radius = (p.s / 100) * (Math.min(width, height) * 0.35);
+                
+                p.tx = cx + Math.cos(angle) * radius;
+                p.ty = cy + Math.sin(angle) * radius;
+
+            } else if (currentMode === 'cylinder') {
+                // X = Hue, Y = Lightness (but compressed to look 3D), Z-sort simulated by Y offset
+                // This creates a faux-3D cylinder look
+                const angle = (p.h * Math.PI) / 180;
+                const cylinderRadius = 150;
+                
+                // Spread horizontally based on angle (sine wave)
+                p.tx = cx + Math.cos(angle) * cylinderRadius * 1.5;
+                
+                // Spread vertically based on Lightness + tilt
+                p.ty = (height * 0.2) + ((100 - p.l) / 100) * (height * 0.6) + Math.sin(angle) * 40;
+
+            } else if (currentMode === 'random') {
+                p.tx = Math.random() * width;
+                p.ty = Math.random() * height;
+            }
+        });
+    }
+
+    // --- 3. Initialization & Loop ---
+
+    function init() {
+        resize();
+        // Create particles
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            particles.push(new Particle());
+        }
+        updateTargets();
+        loop();
+    }
+
+    function loop() {
+        // Clear screen with a slight trail effect (optional, here we do hard clear)
+        ctx.clearRect(0, 0, width, height);
+
+        particles.forEach(p => {
+            p.update();
+            p.draw();
+        });
+
+        requestAnimationFrame(loop);
+    }
+
+    // --- 4. Events & UI ---
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        cx = width / 2;
+        cy = height / 2;
+        canvas.width = width;
+        canvas.height = height;
+        updateTargets();
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        updateTargets();
+        
+        // Update buttons
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        document.getElementById(`btn-${mode}`).classList.add('active');
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>

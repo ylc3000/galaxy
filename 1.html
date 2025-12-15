@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Distribution 3D</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap');
+
+        :root {
+            --bg: #1d1f20;
+            --text-main: #fff;
+            --text-muted: #666;
+            --accent: #00d1b2;
+            --panel-bg: transparent;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg);
+            font-family: 'Roboto', sans-serif;
+            color: var(--text-main);
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
+
+        /* --- UI: Title (Top Left) --- */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .header h1 {
+            font-size: 16px;
+            font-weight: 400;
+            color: #888;
+            margin: 0;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            display: inline-block;
+        }
+
+        /* --- UI: Controls (Bottom Right) --- */
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            z-index: 10;
+            display: flex;
+            gap: 40px;
+            text-align: left;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        /* Custom Select Styling to look like text */
+        .select-wrapper {
+            position: relative;
+        }
+        
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            cursor: pointer;
+            padding-right: 15px;
+            outline: none;
+        }
+        
+        select:hover {
+            opacity: 0.8;
+        }
+
+        select option {
+            background: #333;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        /* Tiny arrow for select */
+        .select-wrapper::after {
+            content: '▼';
+            font-size: 8px;
+            color: var(--text-muted);
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        /* --- UI: Toggle Button (Bottom Left) --- */
+        .toggle-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #444;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .toggle-btn:hover {
+            border-color: var(--accent);
+        }
+
+        .toggle-circle {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--text-muted);
+        }
+        
+        .toggle-btn:hover .toggle-circle {
+            background: var(--text-muted);
+        }
+
+        /* --- Tooltip --- */
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+            z-index: 20;
+            border: 1px solid #333;
+        }
+        .tooltip h3 { margin: 0; font-size: 14px; color: #fff; }
+        .tooltip p { margin: 2px 0 0; font-size: 12px; color: var(--accent); font-family: monospace; }
+
+        /* Github Corner */
+        .github-corner { position: absolute; top: 0; right: 0; z-index: 11; }
+        .github-corner svg { fill: #fff; color: var(--bg); }
+        
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Color distribution of Color-Names in various color models</h1>
+    </div>
+
+    <!-- Github Corner -->
+    <a href="https://github.com/meodai/color-names" class="github-corner" aria-label="View source on GitHub">
+        <svg width="80" height="80" viewBox="0 0 250 250" style="fill:#333; color:#1d1f20; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true">
+            <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+            <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
+            <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
+        </svg>
+    </a>
+
+    <div class="controls">
+        <div class="control-group">
+            <span class="control-label">List</span>
+            <div class="select-wrapper">
+                <select id="list-select">
+                    <option value="default" selected>Color Name List</option>
+                    <option value="bestOf">Best of</option>
+                    <option value="short">Short Names</option>
+                    <option value="basic">Basic Colors</option>
+                    <option value="html">HTML / CSS</option>
+                    <option value="wikipedia">Wikipedia</option>
+                    <option value="xkcd">xkcd survey</option>
+                </select>
+            </div>
+        </div>
+        <div class="control-group">
+            <span class="control-label">Model</span>
+            <div class="select-wrapper">
+                <select id="model-select">
+                    <option value="rgb" selected>rgb</option>
+                    <option value="hsl">hsl</option>
+                    <option value="hsv">hsv</option>
+                    <option value="xyz">xyz</option>
+                    <option value="lab">lab</option>
+                    <option value="lch">lch</option>
+                    <option value="luv">luv</option>
+                    <option value="hwb">hwb</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <button class="toggle-btn" id="toggle-dark">
+        <div class="toggle-circle"></div>
+    </button>
+
+    <div class="tooltip" id="tooltip"></div>
+    <div id="canvas-container"></div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
+    <script src="https://unpkg.com/three@0.110.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- Configuration & State ---
+        let scene, camera, renderer, controls;
+        let particles, material, geometry;
+        let wireframeCube;
+        let colorsData = [];
+        let currentModel = 'rgb';
+        let currentList = 'default';
+        let isDark = true;
+        
+        const CUBE_SIZE = 100;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        // Colors
+        const theme = {
+            dark: { bg: 0x1d1f20, cube: 0xffffff, fog: 0x1d1f20 },
+            light: { bg: 0xffffff, cube: 0x000000, fog: 0xffffff }
+        };
+
+        // Color Model Mappings
+        const models = {
+            rgb: { func: 'rgb', x: [0, 255], y: [1, 255], z: [2, 255] },
+            hsl: { func: 'hsl', x: [0, 360], y: [1, 1], z: [2, 1] }, // H, S, L
+            hsv: { func: 'hsv', x: [0, 360], y: [1, 1], z: [2, 1] },
+            xyz: { func: 'xyz', x: [0, 95], y: [1, 100], z: [2, 108] },
+            lab: { func: 'lab', z: [0, 100], y: [1, 128, -128], x: [2, 128, -128] }, // L, a, b (swapped axis for better visual)
+            lch: { func: 'lch', z: [0, 100], y: [1, 100], x: [2, 0, 360] },
+            luv: { func: 'luv', z: [0, 100], y: [1, 200, -100], x: [2, 200, -100] },
+            hwb: { func: 'hwb', x: [0, 360], y: [1, 1], z: [2, 1] }
+        };
+
+        // --- Helpers ---
+
+        // Custom RGB to XYZ conversion because chroma's output varies by version/method
+        function rgbToXyz(r, g, b) {
+            let rr = r / 255, gg = g / 255, bb = b / 255;
+            rr = rr > 0.04045 ? Math.pow((rr + 0.055) / 1.055, 2.4) : rr / 12.92;
+            gg = gg > 0.04045 ? Math.pow((gg + 0.055) / 1.055, 2.4) : gg / 12.92;
+            bb = bb > 0.04045 ? Math.pow((bb + 0.055) / 1.055, 2.4) : bb / 12.92;
+            rr *= 100; gg *= 100; bb *= 100;
+            return [
+                rr * 0.4124 + gg * 0.3576 + bb * 0.1805,
+                rr * 0.2126 + gg * 0.7152 + bb * 0.0722,
+                rr * 0.0193 + gg * 0.1192 + bb * 0.9505
+            ];
+        }
+
+        function translate(val, minIn, maxIn, minOut, maxOut) {
+            return minOut + (maxOut - minOut) * ((val - minIn) / (maxIn - minIn));
+        }
+
+        function createDotTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath();
+            ctx.arc(16, 16, 15, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            const texture = new THREE.Texture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // --- Main Setup ---
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene & Camera
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(theme.dark.bg);
+            // Fog creates depth
+            scene.fog = new THREE.Fog(theme.dark.bg, 150, 350);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(180, 100, 180);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 1.0;
+
+            // Cube Frame
+            createCubeFrame();
+
+            // Load Data
+            fetchColors('default');
+
+            // Events
+            window.addEventListener('resize', onResize);
+            document.getElementById('model-select').addEventListener('change', (e) => updateModel(e.target.value));
+            document.getElementById('list-select').addEventListener('change', (e) => fetchColors(e.target.value));
+            document.getElementById('toggle-dark').addEventListener('click', toggleTheme);
+            window.addEventListener('mousemove', onMouseMove);
+
+            animate();
+        }
+
+        function createCubeFrame() {
+            if (wireframeCube) scene.remove(wireframeCube);
+            
+            const s = CUBE_SIZE / 2;
+            const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+            const edges = new THREE.EdgesGeometry(geometry);
+            const color = isDark ? theme.dark.cube : theme.light.cube;
+            
+            const mat = new THREE.LineBasicMaterial({ 
+                color: color, 
+                opacity: 0.3, 
+                transparent: true 
+            });
+            
+            wireframeCube = new THREE.LineSegments(edges, mat);
+            scene.add(wireframeCube);
+        }
+
+        function fetchColors(listName) {
+            // Using the API meodai uses in the pen
+            fetch(`https://api.color.pizza/v1/?list=${listName}`)
+                .then(r => r.json())
+                .then(data => {
+                    colorsData = data.colors;
+                    updateParticles();
+                })
+                .catch(err => console.error("Failed to load colors", err));
+        }
+
+        function updateParticles() {
+            if (particles) {
+                scene.remove(particles);
+                geometry.dispose();
+                material.dispose();
+            }
+
+            geometry = new THREE.Geometry();
+            const particleColors = [];
+
+            const conf = models[currentModel];
+            const half = CUBE_SIZE / 2;
+
+            colorsData.forEach(c => {
+                const hex = c.hex;
+                const chromaCol = chroma(hex);
+                let components;
+
+                // Handle specific conversions
+                if (currentModel === 'xyz') {
+                    const rgb = chromaCol.rgb();
+                    components = rgbToXyz(rgb[0], rgb[1], rgb[2]);
+                } else if (currentModel === 'luv') {
+                    components = chromaCol.luv();
+                } else {
+                    // Generic handling for hsl, hsv, lab, etc.
+                    try {
+                        components = chromaCol[currentModel]();
+                    } catch(e) {
+                        components = chromaCol.rgb();
+                    }
+                }
+                
+                // Calculate positions based on config (x, y, z indices)
+                // Default indices: 0, 1, 2. Some models swap them for better vertical alignment (e.g. Lightness on Y)
+                const xIdx = conf.x[0];
+                const yIdx = conf.y[0];
+                const zIdx = conf.z[0];
+
+                // Normalize to Cube Size (-50 to 50)
+                let px = translate(components[xIdx], conf.x[2]||0, conf.x[1], -half, half);
+                let py = translate(components[yIdx], conf.y[2]||0, conf.y[1], -half, half);
+                let pz = translate(components[zIdx], conf.z[2]||0, conf.z[1], -half, half);
+
+                // Special Case: Cylindrical coords for HSL/HSV/LCH to look cool (optional, but original does it)
+                if (['hsl', 'hsv', 'lch', 'hwb'].includes(currentModel)) {
+                    const angle = (components[xIdx] * Math.PI) / 180; // Hue is usually index 0
+                    // Saturation or Chroma maps to radius
+                    const radVal = components[yIdx]; // usually index 1
+                    // Map radius: 0-100 or 0-1 -> 0 to 50
+                    const r = translate(radVal, conf.y[2]||0, conf.y[1], 0, half);
+                    
+                    px = Math.sin(angle) * r;
+                    pz = Math.cos(angle) * r;
+                    // Y remains Lightness/Value
+                }
+
+                geometry.vertices.push(new THREE.Vector3(px, py, pz));
+                particleColors.push(new THREE.Color(hex));
+            });
+
+            geometry.colors = particleColors;
+
+            // Material similar to original
+            material = new THREE.PointsMaterial({
+                size: 2.5,
+                vertexColors: THREE.VertexColors,
+                map: createDotTexture(),
+                alphaTest: 0.5,
+                transparent: true,
+                opacity: 1
+            });
+
+            particles = new THREE.Points(geometry, material);
+            particles.name = "particles";
+            scene.add(particles);
+        }
+
+        function updateModel(val) {
+            currentModel = val;
+            updateParticles();
+        }
+
+        function toggleTheme() {
+            isDark = !isDark;
+            const t = isDark ? theme.dark : theme.light;
+            
+            scene.background.setHex(t.bg);
+            scene.fog.color.setHex(t.fog);
+            
+            // Update UI text colors
+            document.documentElement.style.setProperty('--bg', isDark ? '#1d1f20' : '#fff');
+            document.documentElement.style.setProperty('--text-main', isDark ? '#fff' : '#000');
+            
+            createCubeFrame();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            // Basic Raycasting for tooltip
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (!particles) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            // Check intersection with points
+            // Note: Raycasting against points can be heavy/tricky with threshold
+            raycaster.params.Points.threshold = 2;
+            
+            const intersects = raycaster.intersectObject(particles);
+
+            if (intersects.length > 0) {
+                const index = intersects[0].index;
+                const colorData = colorsData[index];
+                if (colorData) {
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = event.clientX + 15 + 'px';
+                    tooltip.style.top = event.clientY + 15 + 'px';
+                    tooltip.innerHTML = `
+                        <h3>${colorData.name}</h3>
+                        <p>${colorData.hex}</p>
+                    `;
+                    tooltip.style.borderColor = colorData.hex;
+                    document.body.style.cursor = 'pointer';
+                }
+            } else {
+                tooltip.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            
+            // Subtle rotation of the particle system itself if desired, 
+            // but orbit controls autoRotate handles camera mostly.
+            if (particles) {
+                // Original code rotates the object slightly
+                // particles.rotation.y += 0.0005;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

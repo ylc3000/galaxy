@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙大爆炸模拟 (The Big Bang Simulation)</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000; /* 深空黑 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #canvas {
+            display: block;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none; /* 让点击穿透到非按钮区域，但这层里按钮需要开启 */
+            z-index: 10;
+        }
+
+        h1 {
+            color: white;
+            font-weight: 300;
+            letter-spacing: 5px;
+            opacity: 0.8;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            font-size: 2rem;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            transition: opacity 1s;
+        }
+
+        #trigger-btn {
+            pointer-events: auto;
+            background: transparent;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.5);
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+
+        #trigger-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.4);
+            border-color: #fff;
+        }
+
+        /* 闪光层，用于大爆炸瞬间的白光 */
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 画布层 -->
+    <canvas id="canvas"></canvas>
+
+    <!-- 闪光层 -->
+    <div id="flash"></div>
+
+    <!-- UI 控制层 -->
+    <div class="ui-layer" id="ui-layer">
+        <h1 id="title">宇宙大爆炸</h1>
+        <button id="trigger-btn">启动奇点</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const flashDiv = document.getElementById('flash');
+        const triggerBtn = document.getElementById('trigger-btn');
+        const uiLayer = document.getElementById('ui-layer');
+        const title = document.getElementById('title');
+
+        let width, height;
+        let particles = [];
+        let stars = [];
+        let animationId;
+        let hasBanged = false;
+
+        // 设置画布大小
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 颜色调色板 (模拟高温到低温: 蓝 -> 白 -> 黄 -> 红 -> 暗紫)
+        const colors = [
+            '#FFFFFF', // 白
+            '#FFFF00', // 黄
+            '#FF4500', // 红橙
+            '#00BFFF', // 深天蓝
+            '#8A2BE2', // 紫罗兰
+            '#FF1493'  // 深粉
+        ];
+
+        // 粒子类
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'explosion' or 'star'
+                
+                // 随机角度和速度
+                const angle = Math.random() * Math.PI * 2;
+                // 使用幂函数让大部分粒子聚集在中心，少部分飞得很远
+                const speed = Math.random() * Math.random() * (Math.random() * 15 + 2); 
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.size = Math.random() * 3 + 0.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 衰减系数 (模拟空间阻力或能量耗散，虽然真空无阻力，但为了视觉效果)
+                this.friction = 0.98; 
+                this.alpha = 1;
+                this.decay = Math.random() * 0.005 + 0.002;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 稍微减速
+                // this.vx *= this.friction;
+                // this.vy *= this.friction;
+
+                // 慢慢消失
+                this.alpha -= this.decay;
+                
+                // 如果粒子变得太暗，它就变成了背景恒星（如果是爆炸粒子）
+                if (this.alpha <= 0.1 && this.type === 'explosion') {
+                   // 有几率变成永久的背景星
+                   if (Math.random() > 0.95) {
+                       this.alpha = Math.random() * 0.5 + 0.2;
+                       this.decay = 0; // 不再消失
+                       this.type = 'star';
+                       this.vx = 0;
+                       this.vy = 0;
+                   }
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 给粒子加一点光晕
+                if (this.type === 'explosion' && this.alpha > 0.5) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        // 奇点脉动效果 (在爆炸前)
+        let pulseSize = 0;
+        let pulseGrowing = true;
+
+        function drawSingularity() {
+            if (hasBanged) return;
+
+            // 清屏（完全黑）
+            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+            ctx.fillRect(0, 0, width, height);
+
+            // 绘制中心奇点
+            const cx = width / 2;
+            const cy = height / 2;
+
+            if (pulseGrowing) {
+                pulseSize += 0.2;
+                if (pulseSize > 10) pulseGrowing = false;
+            } else {
+                pulseSize -= 0.2;
+                if (pulseSize < 5) pulseGrowing = true;
+            }
+
+            // 奇点光辉
+            ctx.shadowBlur = 50;
+            ctx.shadowColor = "white";
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(cx, cy, pulseSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            requestAnimationFrame(drawSingularity);
+        }
+
+        // 大爆炸函数
+        function bigBang() {
+            hasBanged = true;
+            
+            // 1. UI 消失
+            uiLayer.classList.add('hidden');
+            
+            // 2. 屏幕闪白 (模拟强光)
+            flashDiv.style.transition = 'opacity 0.1s';
+            flashDiv.style.opacity = '1';
+            
+            setTimeout(() => {
+                flashDiv.style.transition = 'opacity 2s ease-out';
+                flashDiv.style.opacity = '0';
+            }, 100);
+
+            // 3. 生成大量粒子
+            const particleCount = 2000; // 粒子数量
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle(width / 2, height / 2, 'explosion'));
+            }
+
+            animateExplosion();
+        }
+
+        function animateExplosion() {
+            // 使用半透明背景清屏，产生拖尾效果
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; 
+            ctx.fillRect(0, 0, width, height);
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+
+                // 移除完全消失且没变成恒星的粒子
+                if (p.alpha <= 0 && p.type !== 'star') {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // 如果还剩有粒子或者有恒星，继续动画
+            if (particles.length > 0) {
+                requestAnimationFrame(animateExplosion);
+            } else {
+                // 动画结束后，显示重置按钮
+                uiLayer.classList.remove('hidden');
+                title.innerText = "宇宙冷却 (Universe Cooled)";
+                triggerBtn.innerText = "重启宇宙";
+                hasBanged = false;
+                // 清空恒星以便重新开始
+                particles = [];
+                drawSingularity();
+            }
+        }
+
+        // 初始化
+        drawSingularity();
+
+        // 按钮事件
+        triggerBtn.addEventListener('click', () => {
+            if (!hasBanged) {
+                bigBang();
+            }
+        });
+
+    </script>
+</body>
+</html>
